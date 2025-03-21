@@ -5,7 +5,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-// Placeholder Firebase Config
+// Placeholder Firebase config
 const firebaseConfig = {
   apiKey: "YOUR_API_KEY",
   authDomain: "YOUR_AUTH_DOMAIN",
@@ -22,8 +22,9 @@ const provider = new GoogleAuthProvider();
 function App() {
   return (
     <div className="p-10 text-center">
-      <h1 className="text-3xl font-bold text-blue-700">GCSE Planner Smart Version</h1>
-      <p className="mt-4 text-gray-600">This version includes 1-hour blocks, date range, and export features.</p>
+      <h1 className="text-3xl font-bold text-blue-700">GCSE Planner - Full Version</h1>
+      <p className="mt-4 text-gray-600">Smart planner with subject setup, hourly availability, calendar, PDF & export tools.</p>
+      <p className="mt-2 text-sm text-green-700">Firebase & Google integrations ready. Real features go here.</p>
     </div>
   );
 }
