@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { format, parseISO, eachDayOfInterval, isBefore, addDays, isSameDay } from 'date-fns';
+import { format, parseISO, eachDayOfInterval, isBefore, addDays, isSameDay, compareAsc } from 'date-fns';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import FullCalendar from '@fullcalendar/react';
@@ -41,6 +42,7 @@ const examDates = {
 function GCSEPlanner() {
   const calendarRef = useRef();
   const today = new Date();
+  const startDate = new Date('2025-04-04');
   const endDate = new Date('2025-07-19');
 
   const [selectedSubjects, setSelectedSubjects] = useState([]);
@@ -71,20 +73,25 @@ function GCSEPlanner() {
 
   const generateRevisionEvents = () => {
     const revisionEvents = [];
-    const revisionDays = eachDayOfInterval({ start: today, end: endDate });
+    const revisionDays = eachDayOfInterval({ start: startDate, end: endDate });
     const sessionMap = {};
 
-    selectedSubjects.forEach(subject => {
+    const sortedSubjects = [...selectedSubjects].sort((a, b) => {
+      const dateA = examDates[a]?.[0] ? parseISO(examDates[a][0]) : endDate;
+      const dateB = examDates[b]?.[0] ? parseISO(examDates[b][0]) : endDate;
+      return compareAsc(dateA, dateB);
+    });
+
+    sortedSubjects.forEach(subject => {
       const subjectExamDates = examDates[subject] || [];
       const lastExam = subjectExamDates.map(d => parseISO(d)).sort((a, b) => b - a)[0];
       const availableDays = revisionDays.filter(day => isBefore(day, lastExam));
-      const spread = Math.max(1, Math.floor(availableDays.length / selectedSubjects.length));
+      const spread = Math.max(1, Math.floor(availableDays.length / sortedSubjects.length));
 
-      for (let i = 0; i < spread && i < availableDays.length; i++) {
+      for (let i = 0; i < availableDays.length; i++) {
         const date = availableDays[i];
         const dayName = format(date, 'EEEE');
         const slots = availability[dayName];
-
         if (!slots || slots.length === 0) continue;
 
         const key = format(date, 'yyyy-MM-dd');
@@ -98,6 +105,7 @@ function GCSEPlanner() {
         });
 
         sessionMap[key].add(subject);
+        break;
       }
     });
 

@@ -1,5 +1,6 @@
+
 export default {
-  content: ['./index.html', './App.jsx', './main.jsx'],
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {},
   },
