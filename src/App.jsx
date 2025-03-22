@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { format, parseISO, eachDayOfInterval, isBefore, addDays, isSameDay, compareAsc } from 'date-fns';
+import { format, parseISO, eachDayOfInterval, isBefore, compareAsc } from 'date-fns';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import FullCalendar from '@fullcalendar/react';
@@ -40,7 +41,6 @@ const examDates = {
 
 function GCSEPlanner() {
   const calendarRef = useRef();
-  const today = new Date();
   const startDate = new Date('2025-04-04');
   const endDate = new Date('2025-07-19');
 
@@ -74,30 +74,29 @@ function GCSEPlanner() {
     const revisionEvents = [];
     const revisionDays = eachDayOfInterval({ start: startDate, end: endDate });
     const sessionMap = {};
-    const dailySlots = {};
+    const daySlots = {};
 
     revisionDays.forEach(day => {
       const dayName = format(day, 'EEEE');
       const key = format(day, 'yyyy-MM-dd');
-      dailySlots[key] = availability[dayName] || [];
+      daySlots[key] = availability[dayName] || [];
       sessionMap[key] = [];
     });
 
-    const subjectQueue = selectedSubjects.map(subject => {
-      const subjectExams = examDates[subject]?.map(parseISO).filter(d => isBefore(startDate, d));
-      const lastExamDate = subjectExams.sort((a, b) => b - a)[0];
-      return { subject, lastExamDate };
-    }).sort((a, b) => compareAsc(a.lastExamDate, b.lastExamDate));
+    const upcomingSubjects = selectedSubjects.map(subject => {
+      const subjectExams = (examDates[subject] || []).map(parseISO).filter(d => isBefore(startDate, d));
+      const earliestExam = subjectExams.sort(compareAsc)[0];
+      return { subject, examDate: earliestExam };
+    }).filter(s => s.examDate).sort((a, b) => compareAsc(a.examDate, b.examDate));
 
     revisionDays.forEach(day => {
       const key = format(day, 'yyyy-MM-dd');
-      const slots = dailySlots[key];
+      const slots = daySlots[key];
       if (!slots.length) return;
 
       for (const slot of slots) {
-        for (const item of subjectQueue) {
-          const { subject, lastExamDate } = item;
-          if (isBefore(day, lastExamDate)) {
+        for (const { subject, examDate } of upcomingSubjects) {
+          if (isBefore(day, examDate)) {
             if (!sessionMap[key].includes(subject)) {
               revisionEvents.push({
                 title: `Revise ${subject}`,
@@ -152,6 +151,7 @@ function GCSEPlanner() {
     <div className="p-6 font-sans">
       <h1 className="text-4xl font-bold text-blue-700 mb-4">📘 GCSE Planner – Final Version</h1>
       <p className="text-gray-700 mb-4">Now with smart revision scheduling and custom availability.</p>
+
       <div className="mb-8">
         <h2 className="text-xl font-semibold text-gray-800 mb-2">Select Your Subjects</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -167,6 +167,7 @@ function GCSEPlanner() {
           ))}
         </div>
       </div>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {Object.keys(availability).map(day => (
           <div key={day} className="bg-white p-3 shadow rounded">
@@ -187,6 +188,7 @@ function GCSEPlanner() {
           </div>
         ))}
       </div>
+
       <div className="flex flex-wrap gap-4 mb-6">
         <button onClick={exportPDF} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow">
           Download PDF
@@ -198,6 +200,7 @@ function GCSEPlanner() {
           Add to Google Calendar
         </button>
       </div>
+
       <div ref={calendarRef} className="bg-white p-4 rounded shadow-xl">
         <FullCalendar
           plugins={[dayGridPlugin]}
