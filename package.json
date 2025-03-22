@@ -1,6 +1,6 @@
 
 {
-  "name": "gcse-planner",
+  "name": "gcse-planner-full",
   "version": "1.0.0",
   "scripts": {
     "dev": "vite",
