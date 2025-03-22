@@ -21,3 +21,4 @@ const timeBlocks = [
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 // The rest of the component is unchanged from earlier...
+export default GCSEPlanner;
