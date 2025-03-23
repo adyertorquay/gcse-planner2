@@ -90,6 +90,7 @@ function GCSEPlanner() {
       return { subject, exams, finalExam };
     }).sort((a, b) => compareAsc(a.finalExam, b.finalExam));
 
+    // Priority 1: Lock in revision the day before each exam
     examSchedule.forEach(({ subject, exams }) => {
       exams.forEach(examDate => {
         const dayBefore = format(subDays(examDate, 1), 'yyyy-MM-dd');
@@ -104,6 +105,7 @@ function GCSEPlanner() {
       });
     });
 
+    // Priority 2: Early phase general balanced revision
     revisionDays.forEach(day => {
       const key = format(day, 'yyyy-MM-dd');
       const slots = daySlots[key];
@@ -123,6 +125,7 @@ function GCSEPlanner() {
       }
     });
 
+    // Priority 3: Smart allocation leading up to each exam
     revisionDays.forEach(day => {
       const key = format(day, 'yyyy-MM-dd');
       const slots = daySlots[key];
