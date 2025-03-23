@@ -85,18 +85,18 @@ function GCSEPlanner() {
     });
 
     const examSchedule = selectedSubjects.map(subject => {
-      const exams = (examDates[subject] || []).map(parseISO).sort(compareAsc);
-      return { subject, exams };
-    });
+      const exams = (examDates[subject] || []).map(parseISO);
+      const finalExam = exams.sort(compareAsc)[exams.length - 1];
+      return { subject, exams, finalExam };
+    }).sort((a, b) => compareAsc(a.finalExam, b.finalExam));
 
-    // Priority 1: Lock in revision the day before each exam
     examSchedule.forEach(({ subject, exams }) => {
       exams.forEach(examDate => {
         const dayBefore = format(subDays(examDate, 1), 'yyyy-MM-dd');
         const slots = daySlots[dayBefore] || [];
-        if (!sessionMap[dayBefore].includes(subject)) {
-          for (const slot of slots) {
-            revisionEvents.push({ title: `Revise ${subject}`, date: dayBefore, color: '#1E40AF' });
+        for (const slot of slots) {
+          if (!sessionMap[dayBefore].includes(subject)) {
+            revisionEvents.push({ title: `Revise ${subject}`, date: dayBefore, time: slot, color: '#1E40AF' });
             sessionMap[dayBefore].push(subject);
             break;
           }
@@ -104,7 +104,25 @@ function GCSEPlanner() {
       });
     });
 
-    // Priority 2: Smart allocation based on next exam
+    revisionDays.forEach(day => {
+      const key = format(day, 'yyyy-MM-dd');
+      const slots = daySlots[key];
+      if (!slots.length || sessionMap[key].length >= slots.length) return;
+
+      const isEarlyPhase = isBefore(day, intensiveStart);
+      if (isEarlyPhase) {
+        for (const slot of slots) {
+          const index = (revisionDays.indexOf(day) + slots.indexOf(slot)) % selectedSubjects.length;
+          const subject = selectedSubjects[index];
+          if (!sessionMap[key].includes(subject)) {
+            revisionEvents.push({ title: `Revise ${subject}`, date: key, time: slot, color: '#3B82F6' });
+            sessionMap[key].push(subject);
+            break;
+          }
+        }
+      }
+    });
+
     revisionDays.forEach(day => {
       const key = format(day, 'yyyy-MM-dd');
       const slots = daySlots[key];
@@ -112,9 +130,9 @@ function GCSEPlanner() {
 
       for (const slot of slots) {
         for (const { subject, exams } of examSchedule) {
-          const upcomingExam = exams.find(d => isBefore(day, d));
-          if (upcomingExam && !sessionMap[key].includes(subject)) {
-            revisionEvents.push({ title: `Revise ${subject}`, date: key, color: '#3B82F6' });
+          const nextExam = exams.find(d => isBefore(day, d));
+          if (nextExam && !sessionMap[key].includes(subject)) {
+            revisionEvents.push({ title: `Revise ${subject}`, date: key, time: slot, color: '#60A5FA' });
             sessionMap[key].push(subject);
             break;
           }
@@ -128,8 +146,9 @@ function GCSEPlanner() {
   const exportICS = () => {
     const events = [...examEvents, ...revisionEvents].map(e => {
       const [year, month, day] = e.date.split('-').map(Number);
+      const [hour, minute] = e.time ? e.time.split(':').map(Number) : [9, 0];
       return {
-        start: [year, month, day, 9, 0],
+        start: [year, month, day, hour, minute],
         duration: { hours: 1 },
         title: e.title,
         status: 'CONFIRMED'
@@ -166,7 +185,7 @@ function GCSEPlanner() {
 
   const examEvents = Object.entries(examDates).flatMap(([subject, dates]) =>
     selectedSubjects.includes(subject)
-      ? dates.map(date => ({ title: `${subject} Exam`, date, color: '#FF5733' }))
+      ? dates.map(date => ({ title: `${subject} Exam`, date, color: '#FF5733', time: '09:00' }))
       : []
   );
 
