@@ -85,19 +85,19 @@ function GCSEPlanner() {
     });
 
     const examSchedule = selectedSubjects.map(subject => {
-      const exams = (examDates[subject] || []).map(parseISO);
-      const finalExam = exams.sort(compareAsc)[exams.length - 1];
+      const exams = (examDates[subject] || []).map(parseISO).sort(compareAsc);
+      const finalExam = exams[exams.length - 1];
       return { subject, exams, finalExam };
     }).sort((a, b) => compareAsc(a.finalExam, b.finalExam));
 
-    // Priority 1: Lock in revision the day before each exam
+    // Priority 1: Day-before-exam revision
     examSchedule.forEach(({ subject, exams }) => {
       exams.forEach(examDate => {
         const dayBefore = format(subDays(examDate, 1), 'yyyy-MM-dd');
         const slots = daySlots[dayBefore] || [];
         for (const slot of slots) {
           if (!sessionMap[dayBefore].includes(subject)) {
-            revisionEvents.push({ title: `Revise ${subject}`, date: dayBefore, time: slot, color: '#1E40AF' });
+            revisionEvents.push({ title: `Revise ${subject}`, date: dayBefore, color: '#1E40AF' });
             sessionMap[dayBefore].push(subject);
             break;
           }
@@ -105,39 +105,21 @@ function GCSEPlanner() {
       });
     });
 
-    // Phase 1: Balanced subject coverage before intensive period (before April 22)
+    // Priority 2: Fairly balanced revision leading to nearest exams
     revisionDays.forEach(day => {
       const key = format(day, 'yyyy-MM-dd');
-      if (!isBefore(day, new Date('2025-04-22'))) return;
-
       const slots = daySlots[key];
       if (!slots.length || sessionMap[key].length >= slots.length) return;
 
+      // Find most urgent subjects
+      const upcomingSubjects = examSchedule
+        .filter(({ exams }) => exams.some(exam => isBefore(day, exam)))
+        .sort((a, b) => compareAsc(a.exams.find(d => isBefore(day, d)), b.exams.find(d => isBefore(day, d))));
+
       for (const slot of slots) {
-        for (let i = 0; i < selectedSubjects.length; i++) {
-          const subject = selectedSubjects[(revisionDays.indexOf(day) + i) % selectedSubjects.length];
+        for (const { subject } of upcomingSubjects) {
           if (!sessionMap[key].includes(subject)) {
-            revisionEvents.push({ title: `Revise ${subject}`, date: key, time: slot, color: '#60A5FA' });
-            sessionMap[key].push(subject);
-            break;
-          }
-        }
-      }
-    });
-
-    // Phase 2: Focus on upcoming exams from April 22 onwards
-    revisionDays.forEach(day => {
-      const key = format(day, 'yyyy-MM-dd');
-      if (isBefore(day, new Date('2025-04-22'))) return;
-
-      const slots = daySlots[key];
-      if (!slots.length || sessionMap[key].length >= slots.length) return;
-
-      for (const slot of slots) {
-        for (const { subject, exams } of examSchedule) {
-          const nextExam = exams.find(d => isBefore(day, d));
-          if (nextExam && !sessionMap[key].includes(subject)) {
-            revisionEvents.push({ title: `Revise ${subject}`, date: key, time: slot, color: '#3B82F6' });
+            revisionEvents.push({ title: `Revise ${subject}`, date: key, color: '#60A5FA' });
             sessionMap[key].push(subject);
             break;
           }
