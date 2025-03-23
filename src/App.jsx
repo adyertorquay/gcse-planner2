@@ -130,10 +130,11 @@ function GCSEPlanner() {
     return revisionEvents;
   };
 
+  
   const exportICS = () => {
     const events = [...examEvents, ...revisionEvents].map(e => {
       const [year, month, day] = e.date.split('-').map(Number);
-      const [hour, minute] = (e.time || '09:00').split(':').map(Number);
+      const [hour, minute] = (e.time || '09:00').split(':').map(Number); // Use real time if available
       return {
         start: [year, month, day, hour, minute],
         duration: { hours: 1 },
@@ -141,6 +142,7 @@ function GCSEPlanner() {
         status: 'CONFIRMED'
       };
     });
+
     createEvents(events, (error, value) => {
       if (error) return console.log(error);
       const blob = new Blob([value], { type: 'text/calendar;charset=utf-8' });
@@ -152,96 +154,4 @@ function GCSEPlanner() {
     });
   };
 
-  const exportPDF = () => {
-    const calendarElement = calendarRef.current;
-    if (!calendarElement) return;
-
-    html2canvas(calendarElement).then(canvas => {
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF();
-      const width = pdf.internal.pageSize.getWidth();
-      const height = (canvas.height * width) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, width, height);
-      pdf.save('gcse-timetable.pdf');
-    });
-  };
-
-  const printPage = () => {
-    window.print();
-  };
-
-  const examEvents = Object.entries(examDates).flatMap(([subject, dates]) =>
-    selectedSubjects.includes(subject)
-      ? dates.map(date => ({ title: `${subject} Exam`, date, color: '#FF5733' }))
-      : []
-  );
-
-  const revisionEvents = generateRevisionEvents();
-
-  return (
-    <div className="p-6 font-sans">
-      <h1 className="text-4xl font-bold text-blue-700 mb-4">📘 GCSE Planner</h1>
-      <p className="text-gray-700 mb-4">Smart revision scheduler with export features</p>
-
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-2">Select Your Subjects</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          {allSubjects.map(subject => (
-            <label key={subject} className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={selectedSubjects.includes(subject)}
-                onChange={() => toggleSubject(subject)}
-              />
-              <span>{subject}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        {Object.keys(availability).map(day => (
-          <div key={day} className="bg-white p-3 shadow rounded">
-            <h3 className="font-semibold text-blue-700 mb-2">{day}</h3>
-            {timeSlots.map(slot => (
-              <div key={slot}>
-                <label className="inline-flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={availability[day].includes(slot)}
-                    onChange={() => handleAvailabilityChange(day, slot)}
-                    className="mr-2"
-                  />
-                  {slot}
-                </label>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap gap-4 mb-6">
-        <button onClick={exportPDF} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow">
-          Download PDF
-        </button>
-        <button onClick={printPage} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow">
-          Print Timetable
-        </button>
-        <button onClick={exportICS} className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded shadow">
-          Export Calendar (.ics)
-        </button>
-      </div>
-
-      <div ref={calendarRef} className="bg-white p-4 rounded shadow-xl">
-        <FullCalendar
-          plugins={[dayGridPlugin]}
-          initialView="dayGridMonth"
-          events={[...examEvents, ...revisionEvents]}
-          height={600}
-        />
-      </div>
-    </div>
-  );
 }
-
-export default GCSEPlanner;
