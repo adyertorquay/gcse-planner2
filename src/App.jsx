@@ -1,9 +1,10 @@
-import React, { useState, useRef } from 'react';
-import { format, parseISO, eachDayOfInterval, isBefore, compareAsc } from 'date-fns';
+import React, { useState, useRef, useEffect } from 'react';
+import { format, parseISO, eachDayOfInterval, isBefore, compareAsc, isEqual, subDays } from 'date-fns';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
+import { createEvents } from 'ics';
 
 const allSubjects = [
   'Maths', 'English Language', 'English Literature', 'Biology', 'Chemistry', 'Physics',
@@ -84,41 +85,65 @@ function GCSEPlanner() {
     });
 
     const examSchedule = selectedSubjects.map(subject => {
-      const exams = (examDates[subject] || []).map(parseISO);
-      const finalExam = exams.sort(compareAsc)[exams.length - 1];
-      return { subject, exams, finalExam };
-    }).sort((a, b) => compareAsc(a.finalExam, b.finalExam));
+      const exams = (examDates[subject] || []).map(parseISO).sort(compareAsc);
+      return { subject, exams };
+    });
 
+    // Priority 1: Lock in revision the day before each exam
+    examSchedule.forEach(({ subject, exams }) => {
+      exams.forEach(examDate => {
+        const dayBefore = format(subDays(examDate, 1), 'yyyy-MM-dd');
+        const slots = daySlots[dayBefore] || [];
+        if (!sessionMap[dayBefore].includes(subject)) {
+          for (const slot of slots) {
+            revisionEvents.push({ title: `Revise ${subject}`, date: dayBefore, color: '#1E40AF' });
+            sessionMap[dayBefore].push(subject);
+            break;
+          }
+        }
+      });
+    });
+
+    // Priority 2: Smart allocation based on next exam
     revisionDays.forEach(day => {
       const key = format(day, 'yyyy-MM-dd');
       const slots = daySlots[key];
-      if (!slots.length) return;
+      if (!slots.length || sessionMap[key].length >= slots.length) return;
 
       for (const slot of slots) {
-        const isEarlyPhase = isBefore(day, intensiveStart);
-        if (isEarlyPhase) {
-          // Even distribution pre-intense phase
-          const index = (revisionDays.indexOf(day) + slots.indexOf(slot)) % selectedSubjects.length;
-          const subject = selectedSubjects[index];
-          if (!sessionMap[key].includes(subject)) {
+        for (const { subject, exams } of examSchedule) {
+          const upcomingExam = exams.find(d => isBefore(day, d));
+          if (upcomingExam && !sessionMap[key].includes(subject)) {
             revisionEvents.push({ title: `Revise ${subject}`, date: key, color: '#3B82F6' });
             sessionMap[key].push(subject);
             break;
-          }
-        } else {
-          for (const { subject, exams } of examSchedule) {
-            const nextExam = exams.find(exam => isBefore(day, exam));
-            if (nextExam && !sessionMap[key].includes(subject)) {
-              revisionEvents.push({ title: `Revise ${subject}`, date: key, color: '#3B82F6' });
-              sessionMap[key].push(subject);
-              break;
-            }
           }
         }
       }
     });
 
     return revisionEvents;
+  };
+
+  const exportICS = () => {
+    const events = [...examEvents, ...revisionEvents].map(e => {
+      const [year, month, day] = e.date.split('-').map(Number);
+      return {
+        start: [year, month, day, 9, 0],
+        duration: { hours: 1 },
+        title: e.title,
+        status: 'CONFIRMED'
+      };
+    });
+    createEvents(events, (error, value) => {
+      if (error) return console.log(error);
+      const blob = new Blob([value], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'gcse-timetable.ics';
+      a.click();
+    });
   };
 
   const exportPDF = () => {
@@ -135,20 +160,13 @@ function GCSEPlanner() {
     });
   };
 
-  const printPage = () => window.print();
-
-  const addToGoogleCalendar = () => {
-    const gcalUrl = 'https://calendar.google.com/calendar/u/0/r/eventedit?text=GCSE+Revision+Planner&details=This+is+your+revision+calendar+exported+from+GCSE+Planner&location=&sf=true';
-    window.open(gcalUrl, '_blank');
+  const printPage = () => {
+    window.print();
   };
 
   const examEvents = Object.entries(examDates).flatMap(([subject, dates]) =>
     selectedSubjects.includes(subject)
-      ? dates.map(date => ({
-          title: `${subject} Exam`,
-          date,
-          color: '#FF5733'
-        }))
+      ? dates.map(date => ({ title: `${subject} Exam`, date, color: '#FF5733' }))
       : []
   );
 
@@ -203,8 +221,8 @@ function GCSEPlanner() {
         <button onClick={printPage} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow">
           Print Timetable
         </button>
-        <button onClick={addToGoogleCalendar} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded shadow">
-          Add to Google Calendar
+        <button onClick={exportICS} className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded shadow">
+          Export Calendar (.ics)
         </button>
       </div>
 
