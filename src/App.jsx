@@ -3,6 +3,7 @@ import { format, parseISO, eachDayOfInterval, isBefore, compareAsc } from 'date-
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import FullCalendar from '@fullcalendar/react';
+import { createEvents } from 'ics';
 import dayGridPlugin from '@fullcalendar/daygrid';
 
 const allSubjects = [
@@ -154,7 +155,29 @@ function GCSEPlanner() {
 
   const revisionEvents = generateRevisionEvents();
 
-  return (
+  
+  const exportICS = () => {
+    const events = [...examEvents, ...revisionEvents].map(e => {
+      const [year, month, day] = e.date.split('-').map(Number);
+      const [hour, minute] = e.time ? e.time.split(':').map(Number) : [9, 0];
+      return {
+        start: [year, month, day, hour, minute],
+        duration: { hours: 1 },
+        title: e.title,
+        status: 'CONFIRMED'
+      };
+    });
+    createEvents(events, (error, value) => {
+      if (error) return console.log(error);
+      const blob = new Blob([value], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'gcse-timetable.ics';
+      a.click();
+    });
+  };
+return (
     <div className="p-6 font-sans">
       <h1 className="text-4xl font-bold text-blue-700 mb-4">📘 GCSE Planner – Final Version</h1>
       <p className="text-gray-700 mb-4">Now with smart revision scheduling and custom availability.</p>
