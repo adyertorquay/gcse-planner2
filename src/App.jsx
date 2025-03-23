@@ -97,7 +97,7 @@ function GCSEPlanner() {
         const slots = daySlots[dayBefore] || [];
         for (const slot of slots) {
           if (!sessionMap[dayBefore].includes(subject)) {
-            revisionEvents.push({ title: `Revise ${subject}`, date: dayBefore, color: '#1E40AF' });
+            revisionEvents.push({ title: `Revise ${subject}`, date: dayBefore, color: '#1E40AF', time: slot });
             sessionMap[dayBefore].push(subject);
             break;
           }
@@ -119,7 +119,7 @@ function GCSEPlanner() {
       for (const slot of slots) {
         for (const { subject } of upcomingSubjects) {
           if (!sessionMap[key].includes(subject)) {
-            revisionEvents.push({ title: `Revise ${subject}`, date: key, color: '#60A5FA' });
+            revisionEvents.push({ title: `Revise ${subject}`, date: key, color: '#60A5FA', time: slot });
             sessionMap[key].push(subject);
             break;
           }
@@ -132,6 +132,12 @@ function GCSEPlanner() {
 
   const exportICS = () => {
     const events = [...examEvents, ...revisionEvents].map(e => {
+      let hour = 9, minute = 0;
+      if (e.time) {
+        const [h, m] = e.time.split(':');
+        hour = parseInt(h);
+        minute = parseInt(m);
+      }
       const [year, month, day] = e.date.split('-').map(Number);
       const [hour, minute] = (e.time || '09:00').split(':').map(Number);
       return {
