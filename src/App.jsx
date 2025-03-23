@@ -90,7 +90,7 @@ function GCSEPlanner() {
       return { subject, exams, finalExam };
     }).sort((a, b) => compareAsc(a.finalExam, b.finalExam));
 
-    // Day-before exam priority
+    // Priority 1: Lock in revision the day before each exam
     examSchedule.forEach(({ subject, exams }) => {
       exams.forEach(examDate => {
         const dayBefore = format(subDays(examDate, 1), 'yyyy-MM-dd');
@@ -105,18 +105,19 @@ function GCSEPlanner() {
       });
     });
 
-    // Balanced revision before 22nd April
+    // Phase 1: Balanced subject coverage before intensive period (before April 22)
     revisionDays.forEach(day => {
       const key = format(day, 'yyyy-MM-dd');
+      if (!isBefore(day, new Date('2025-04-22'))) return;
+
       const slots = daySlots[key];
       if (!slots.length || sessionMap[key].length >= slots.length) return;
 
-      if (isBefore(day, intensiveStart)) {
-        for (const slot of slots) {
-          const index = (revisionDays.indexOf(day) + slots.indexOf(slot)) % selectedSubjects.length;
-          const subject = selectedSubjects[index];
+      for (const slot of slots) {
+        for (let i = 0; i < selectedSubjects.length; i++) {
+          const subject = selectedSubjects[(revisionDays.indexOf(day) + i) % selectedSubjects.length];
           if (!sessionMap[key].includes(subject)) {
-            revisionEvents.push({ title: `Revise ${subject}`, date: key, time: slot, color: '#3B82F6' });
+            revisionEvents.push({ title: `Revise ${subject}`, date: key, time: slot, color: '#60A5FA' });
             sessionMap[key].push(subject);
             break;
           }
@@ -124,9 +125,11 @@ function GCSEPlanner() {
       }
     });
 
-    // Focused revision leading to exams after 22nd April
+    // Phase 2: Focus on upcoming exams from April 22 onwards
     revisionDays.forEach(day => {
       const key = format(day, 'yyyy-MM-dd');
+      if (isBefore(day, new Date('2025-04-22'))) return;
+
       const slots = daySlots[key];
       if (!slots.length || sessionMap[key].length >= slots.length) return;
 
@@ -134,7 +137,7 @@ function GCSEPlanner() {
         for (const { subject, exams } of examSchedule) {
           const nextExam = exams.find(d => isBefore(day, d));
           if (nextExam && !sessionMap[key].includes(subject)) {
-            revisionEvents.push({ title: `Revise ${subject}`, date: key, time: slot, color: '#60A5FA' });
+            revisionEvents.push({ title: `Revise ${subject}`, date: key, time: slot, color: '#3B82F6' });
             sessionMap[key].push(subject);
             break;
           }
