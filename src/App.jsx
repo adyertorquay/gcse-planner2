@@ -97,7 +97,7 @@ function GCSEPlanner() {
         const slots = daySlots[dayBefore] || [];
         for (const slot of slots) {
           if (!sessionMap[dayBefore].includes(subject)) {
-            revisionEvents.push({ title: `Revise ${subject}`, date: dayBefore, color: '#1E40AF' });
+            revisionEvents.push({ title: `Revise ${subject}`, date: dayBefore, time: slot, color: '#1E40AF' });
             sessionMap[dayBefore].push(subject);
             break;
           }
@@ -119,7 +119,7 @@ function GCSEPlanner() {
       for (const slot of slots) {
         for (const { subject } of upcomingSubjects) {
           if (!sessionMap[key].includes(subject)) {
-            revisionEvents.push({ title: `Revise ${subject}`, date: key, color: '#60A5FA' });
+            revisionEvents.push({ title: `Revise ${subject}`, date: key, time: slot, color: '#60A5FA' });
             sessionMap[key].push(subject);
             break;
           }
