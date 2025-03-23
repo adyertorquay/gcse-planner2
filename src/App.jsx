@@ -38,4 +38,189 @@ const examDates = {
   'Design Technology': ['2025-06-18']
 };
 
-// ...rest of the file omitted for brevity (already in canvas)
+function GCSEPlanner() {
+  const calendarRef = useRef();
+  const startDate = new Date('2025-04-04');
+  const endDate = new Date('2025-07-19');
+  const intensiveStart = new Date('2025-04-22');
+
+  const [selectedSubjects, setSelectedSubjects] = useState([]);
+  const [availability, setAvailability] = useState({
+    Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [], Sunday: []
+  });
+
+  const timeSlots = [
+    '08:00', '09:00', '10:00', '11:00',
+    '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
+    '18:00', '19:00', '20:00', '21:00'
+  ];
+
+  const handleAvailabilityChange = (day, time) => {
+    setAvailability(prev => {
+      const daySlots = new Set(prev[day]);
+      if (daySlots.has(time)) daySlots.delete(time);
+      else daySlots.add(time);
+      return { ...prev, [day]: Array.from(daySlots).sort() };
+    });
+  };
+
+  const toggleSubject = subject => {
+    setSelectedSubjects(prev =>
+      prev.includes(subject) ? prev.filter(s => s !== subject) : [...prev, subject]
+    );
+  };
+
+  const generateRevisionEvents = () => {
+    const revisionEvents = [];
+    const revisionDays = eachDayOfInterval({ start: startDate, end: endDate });
+    const sessionMap = {};
+    const daySlots = {};
+
+    revisionDays.forEach(day => {
+      const key = format(day, 'yyyy-MM-dd');
+      const dayName = format(day, 'EEEE');
+      daySlots[key] = availability[dayName] || [];
+      sessionMap[key] = [];
+    });
+
+    const examSchedule = selectedSubjects.map(subject => {
+      const exams = (examDates[subject] || []).map(parseISO);
+      const finalExam = exams.sort(compareAsc)[exams.length - 1];
+      return { subject, exams, finalExam };
+    }).sort((a, b) => compareAsc(a.finalExam, b.finalExam));
+
+    revisionDays.forEach(day => {
+      const key = format(day, 'yyyy-MM-dd');
+      const slots = daySlots[key];
+      if (!slots.length) return;
+
+      for (const slot of slots) {
+        for (const { subject, exams } of examSchedule) {
+          const nextExam = exams.find(d => isBefore(day, d));
+          const isEarlyPhase = isBefore(day, intensiveStart);
+          const isDayBeforeExam = exams.some(d => isEqual(subDays(d, 1), day));
+
+          if (isDayBeforeExam && !sessionMap[key].includes(subject)) {
+            revisionEvents.push({ title: `Revise ${subject}`, date: key, color: '#1E40AF' });
+            sessionMap[key].push(subject);
+            break;
+          } else if (isEarlyPhase) {
+            const subjectIndex = (revisionDays.indexOf(day) + slots.indexOf(slot)) % selectedSubjects.length;
+            const currentSubject = selectedSubjects[subjectIndex];
+            if (!sessionMap[key].includes(currentSubject)) {
+              revisionEvents.push({ title: `Revise ${currentSubject}`, date: key, color: '#3B82F6' });
+              sessionMap[key].push(currentSubject);
+              break;
+            }
+          } else if (nextExam) {
+            if (!sessionMap[key].includes(subject)) {
+              revisionEvents.push({ title: `Revise ${subject}`, date: key, color: '#60A5FA' });
+              sessionMap[key].push(subject);
+              break;
+            }
+          }
+        }
+      }
+    });
+
+    return revisionEvents;
+  };
+
+  const exportPDF = () => {
+    const calendarElement = calendarRef.current;
+    if (!calendarElement) return;
+
+    html2canvas(calendarElement).then(canvas => {
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF();
+      const width = pdf.internal.pageSize.getWidth();
+      const height = (canvas.height * width) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, width, height);
+      pdf.save('gcse-timetable.pdf');
+    });
+  };
+
+  const printPage = () => {
+    window.print();
+  };
+
+  const addToGoogleCalendar = () => {
+    const gcalUrl = 'https://calendar.google.com/calendar/u/0/r/eventedit?text=GCSE+Revision+Planner&details=This+is+your+revision+calendar+exported+from+GCSE+Planner&location=&sf=true';
+    window.open(gcalUrl, '_blank');
+  };
+
+  const examEvents = Object.entries(examDates).flatMap(([subject, dates]) =>
+    selectedSubjects.includes(subject)
+      ? dates.map(date => ({ title: `${subject} Exam`, date, color: '#FF5733' }))
+      : []
+  );
+
+  const revisionEvents = generateRevisionEvents();
+
+  return (
+    <div className="p-6 font-sans">
+      <h1 className="text-4xl font-bold text-blue-700 mb-4">📘 GCSE Planner – Final Version</h1>
+      <p className="text-gray-700 mb-4">Now with smart revision scheduling and custom availability.</p>
+
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold text-gray-800 mb-2">Select Your Subjects</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {allSubjects.map(subject => (
+            <label key={subject} className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={selectedSubjects.includes(subject)}
+                onChange={() => toggleSubject(subject)}
+              />
+              <span>{subject}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        {Object.keys(availability).map(day => (
+          <div key={day} className="bg-white p-3 shadow rounded">
+            <h3 className="font-semibold text-blue-700 mb-2">{day}</h3>
+            {timeSlots.map(slot => (
+              <div key={slot}>
+                <label className="inline-flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={availability[day].includes(slot)}
+                    onChange={() => handleAvailabilityChange(day, slot)}
+                    className="mr-2"
+                  />
+                  {slot}
+                </label>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-4 mb-6">
+        <button onClick={exportPDF} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow">
+          Download PDF
+        </button>
+        <button onClick={printPage} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow">
+          Print Timetable
+        </button>
+        <button onClick={addToGoogleCalendar} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded shadow">
+          Add to Google Calendar
+        </button>
+      </div>
+
+      <div ref={calendarRef} className="bg-white p-4 rounded shadow-xl">
+        <FullCalendar
+          plugins={[dayGridPlugin]}
+          initialView="dayGridMonth"
+          events={[...examEvents, ...revisionEvents]}
+          height={600}
+        />
+      </div>
+    </div>
+  );
+}
+
+export default GCSEPlanner;
